@@ -1,0 +1,48 @@
+services:
+  # FastAPI Web Service
+  - type: web
+    name: jarvis-crm-backend
+    env: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    healthCheckPath: /
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+
+  # Celery Worker Service
+  - type: worker
+    name: jarvis-crm-celery-worker
+    env: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    dockerCommand: celery -A app.worker.celery_app worker --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+  # Celery Beat Service
+  - type: worker
+    name: jarvis-crm-celery-beat
+    env: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    dockerCommand: celery -A app.worker.celery_app beat --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false

@@ -1,0 +1,52 @@
+# FastAPI & Web Server
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.4
+python-multipart==0.0.32
+
+# Database & PostgreSQL Drivers (Psycopg 3 with precompiled libpq binaries & Psycopg 2)
+sqlalchemy==2.0.52
+alembic==1.19.2
+greenlet==3.5.5
+# psycopg2==2.9.13
+psycopg2-binary==2.9.12
+
+# Data Validation & Settings
+pydantic==2.13.5
+pydantic-core==2.46.5
+pydantic-settings==2.15.0
+email-validator==2.3.0
+
+# Security & Authentication
+passlib==1.7.4
+pyjwt==2.13.0
+
+# Tabular Data Processing & Spreadsheets
+pandas==3.0.5
+openpyxl==3.1.5
+numpy==2.4.6
+et-xmlfile==2.0.0
+
+# Redis & Caching
+redis==8.1.0
+
+# HTTP Clients & Async I/O
+httpx==0.28.1
+httpcore==1.0.9
+requests==2.34.2
+anyio==4.15.1
+dnspython==2.8.0
+
+# Testing
+pytest==9.1.1
+
+# Environment & Utilities
+python-dotenv==1.2.3
+python-dateutil==2.9.0.post0
+typing-extensions==4.16.0
+
+# Telecaller Module Additional Dependencies
+celery==5.4.0
+phonenumbers==8.13.31
+rapidfuzz==3.6.1
+jinja2==3.1.3

@@ -1,0 +1,31 @@
+# Stage 1: Build React PWA
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+# Install dependencies first for better Docker layer caching
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+
+# Copy source code and build
+COPY frontend ./
+RUN npm run build
+
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
+
+# Remove default nginx static assets
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy built assets
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy nginx config (assuming it's at the root)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Nginx needs permission to run if we want to run as non-root, but standard nginx:alpine runs as root by default.
+# For standard deployment, this is typically sufficient.
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

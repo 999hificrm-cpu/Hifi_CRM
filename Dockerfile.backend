@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+# Prevent Python from writing .pyc files to disk and keep stdout unbuffered
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install system dependencies required for python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first for better Docker caching
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend /app
+COPY scripts /app/scripts
+
+# Create a non-root user for security and adjust ownership
+RUN addgroup --system app && adduser --system --group app && \
+    chown -R app:app /app
+USER app
+
+EXPOSE 8000
+
+# Use proxy-headers for correct HTTPS scheme detection behind Render's load balancer
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
