@@ -6,15 +6,16 @@ services:
     container_name: jarvis_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: jarvis_crm
-      POSTGRES_USER: jarvis_user
+      POSTGRES_DB: ${POSTGRES_DB:-jarvis_crm}
+      POSTGRES_USER: ${POSTGRES_USER:-jarvis_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}
+    # Secure: Only bind to localhost if needed for DBA utilities, never open to public internet
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jarvis_user -d jarvis_crm"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jarvis_user} -d ${POSTGRES_DB:-jarvis_crm}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,8 +24,7 @@ services:
     image: redis:7-alpine
     container_name: jarvis_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # Secure: Do not expose unauthenticated Redis to public internet
     volumes:
       - redis_data:/data
     healthcheck:
@@ -32,6 +32,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Automated Migration & Initial Seed Service
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: jarvis_migration
+    command: sh -c "alembic upgrade head && python production_seed.py"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jarvis_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-jarvis_crm}
+      - SECRET_KEY=${SECRET_KEY:?Set a random SECRET_KEY of at least 32 characters}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   backend:
     build:
@@ -42,16 +58,20 @@ services:
     environment:
       - ENVIRONMENT=production
       - DEBUG=false
-      - DATABASE_URL=postgresql://jarvis_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/jarvis_crm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jarvis_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-jarvis_crm}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:?Set a random SECRET_KEY of at least 32 characters}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    # Internal port for host reverse proxies if needed, otherwise accessed via frontend container
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - storage_uploads:/app/storage_uploads
 
@@ -64,9 +84,10 @@ services:
     command: celery -A app.worker.celery_app worker --loglevel=info
     environment:
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql://jarvis_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/jarvis_crm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jarvis_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-jarvis_crm}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:?Set a random SECRET_KEY of at least 32 characters}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
     depends_on:
       backend:
         condition: service_started
@@ -79,6 +100,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        - VITE_API_BASE_URL=/api/v1
     container_name: jarvis_frontend
     restart: unless-stopped
     ports:
@@ -95,9 +118,10 @@ services:
     command: celery -A app.worker.celery_app beat --loglevel=info
     environment:
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql://jarvis_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/jarvis_crm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jarvis_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-jarvis_crm}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:?Set a random SECRET_KEY of at least 32 characters}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
     depends_on:
       redis:
         condition: service_healthy

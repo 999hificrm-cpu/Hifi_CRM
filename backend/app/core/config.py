@@ -1,10 +1,10 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import List, Optional
+from typing import List, Optional, Union
 from pathlib import Path
 import os
 import secrets
-from pydantic import model_validator
+from pydantic import model_validator, field_validator
 
 
 class Settings(BaseSettings):
@@ -34,15 +34,28 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
-        "*",
         "http://192.168.0.158:5173",
     ]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    import json
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
     
     # File Storage
     STORAGE_PROVIDER: str = Field(default="LOCAL", env="STORAGE_PROVIDER")  # LOCAL, S3, MINIO
